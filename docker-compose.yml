@@ -1,0 +1,13 @@
+services:
+  jxterminal-server:
+    build: .
+    container_name: jxterminal-server
+    restart: unless-stopped
+    ports:
+      - "5000:5000"
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Production
+      - Auth__AllowRegistration=true
+      # - Auth__JwtSecret=your_custom_secret_key_here
+    volumes:
+      - ./data:/app/data

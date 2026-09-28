@@ -1,0 +1,23 @@
+# Build and publish outputs
+bin/
+obj/
+publish/
+
+# Runtime data (TinyDb database and JWT secret)
+data/
+*.db
+*.db-*
+*.db.*
+jwt.secret
+
+# User-specific & IDE files
+.idea/
+.vscode/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# Logs
+logs/
+*.log
