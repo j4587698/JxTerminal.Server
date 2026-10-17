@@ -18,7 +18,10 @@ RUN dotnet publish "JxTerminal.Server.csproj" \
     -c Release \
     -p:PublishAot=true \
     -p:StripSymbols=true \
-    -o /app/publish
+    -p:DebugType=none \
+    -p:DebugSymbols=false \
+    -o /app/publish && \
+    rm -f /app/publish/*.pdb
 
 # Runtime stage using ultra-lean .NET runtime dependencies image
 FROM mcr.microsoft.com/dotnet/runtime-deps:10.0 AS final
