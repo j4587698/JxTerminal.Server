@@ -1,3 +1,5 @@
+using System;
+using System.Collections.Generic;
 using System.Security.Claims;
 using System.Text;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -35,20 +37,29 @@ public sealed class TokenService
             ValidateAudience = true,
             ValidAudience = _audience,
             ValidateLifetime = true,
-            ClockSkew = TimeSpan.FromSeconds(30)
+            ClockSkew = TimeSpan.FromSeconds(30),
+            RoleClaimType = ClaimTypes.Role
         };
     }
 
-    public string CreateToken(string userId, string username)
+    public string CreateToken(string userId, string username, bool isAdmin = false)
     {
+        var claims = new List<Claim>
+        {
+            new(JwtRegisteredClaimNames.Sub, userId),
+            new(JwtRegisteredClaimNames.UniqueName, username),
+            new(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N"))
+        };
+
+        if (isAdmin)
+        {
+            claims.Add(new(ClaimTypes.Role, "Admin"));
+            claims.Add(new("role", "admin"));
+        }
+
         var descriptor = new SecurityTokenDescriptor
         {
-            Subject = new ClaimsIdentity(new[]
-            {
-                new Claim(JwtRegisteredClaimNames.Sub, userId),
-                new Claim(JwtRegisteredClaimNames.UniqueName, username),
-                new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString("N"))
-            }),
+            Subject = new ClaimsIdentity(claims),
             Issuer = _issuer,
             Audience = _audience,
             Expires = DateTime.UtcNow.Add(Lifetime),

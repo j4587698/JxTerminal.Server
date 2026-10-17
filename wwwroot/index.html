@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JxTerminal Server 管理控制台</title>
+  <style>
+    :root {
+      --bg: #0f172a;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --primary: #3b82f6;
+      --primary-hover: #2563eb;
+      --danger: #ef4444;
+      --danger-hover: #dc2626;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --radius: 8px;
+    }
+    [data-theme="light"] {
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --card-border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #64748b;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --danger: #dc2626;
+      --danger-hover: #b91c1c;
+      --success: #059669;
+      --warning: #d97706;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    body { background-color: var(--bg); color: var(--text); min-height: 100vh; display: flex; flex-direction: column; }
+    header { background-color: var(--card-bg); border-bottom: 1px solid var(--card-border); padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; }
+    .logo-area { display: flex; align-items: center; gap: 12px; }
+    .logo-badge { background: linear-gradient(135deg, #2563eb, #38bdf8); color: white; width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: bold; font-size: 18px; }
+    .logo-title { font-size: 18px; font-weight: 700; letter-spacing: -0.5px; }
+    .tag { font-size: 11px; padding: 3px 8px; border-radius: 4px; font-weight: 600; text-transform: uppercase; background: rgba(59, 130, 246, 0.15); color: var(--primary); }
+    .nav-actions { display: flex; align-items: center; gap: 12px; }
+    button { cursor: pointer; border: none; outline: none; border-radius: var(--radius); padding: 8px 16px; font-size: 13px; font-weight: 500; transition: all 0.2s; display: inline-flex; align-items: center; gap: 6px; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-outline { background: transparent; border: 1px solid var(--card-border); color: var(--text); }
+    .btn-outline:hover { background: rgba(255,255,255,0.05); }
+    .btn-danger { background: var(--danger); color: white; }
+    .btn-danger:hover { background: var(--danger-hover); }
+    .btn-sm { padding: 4px 10px; font-size: 12px; }
+    main { flex: 1; padding: 24px; max-width: 1200px; margin: 0 auto; width: 100%; display: flex; flex-direction: column; gap: 24px; }
+    .stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; }
+    .stat-card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 18px; display: flex; flex-direction: column; gap: 6px; }
+    .stat-label { font-size: 12px; color: var(--text-muted); font-weight: 500; }
+    .stat-val { font-size: 26px; font-weight: 700; color: var(--text); }
+    .card { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 20px; }
+    .card-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+    .card-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+    table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+    th { padding: 10px 14px; border-bottom: 1px solid var(--card-border); color: var(--text-muted); font-weight: 600; }
+    td { padding: 12px 14px; border-bottom: 1px solid var(--card-border); vertical-align: middle; }
+    tr:last-child td { border-bottom: none; }
+    .badge-admin { background: rgba(245, 158, 11, 0.15); color: var(--warning); padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+    .badge-user { background: rgba(59, 130, 246, 0.15); color: var(--primary); padding: 2px 8px; border-radius: 4px; font-size: 11px; }
+    .badge-active { color: var(--success); }
+    .badge-disabled { color: var(--danger); }
+    .form-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; }
+    .form-label { font-size: 13px; font-weight: 500; color: var(--text); }
+    .form-hint { font-size: 12px; color: var(--text-muted); }
+    .form-control { background: rgba(0,0,0,0.2); border: 1px solid var(--card-border); color: var(--text); padding: 9px 12px; border-radius: var(--radius); font-size: 13px; }
+    [data-theme="light"] .form-control { background: #f8fafc; }
+    .form-control:focus { outline: none; border-color: var(--primary); }
+    .switch-label { display: flex; align-items: center; gap: 10px; cursor: pointer; user-select: none; }
+    .auth-container { max-width: 400px; margin: 60px auto; width: 100%; }
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); display: none; align-items: center; justify-content: center; z-index: 100; backdrop-filter: blur(2px); }
+    .modal-box { background: var(--card-bg); border: 1px solid var(--card-border); border-radius: var(--radius); width: 90%; max-width: 440px; padding: 22px; }
+    .toast { position: fixed; bottom: 20px; right: 20px; background: var(--card-bg); border: 1px solid var(--card-border); padding: 12px 20px; border-radius: var(--radius); z-index: 200; font-size: 13px; display: none; box-shadow: 0 10px 15px -3px rgba(0,0,0,0.3); }
+  </style>
+</head>
+<body>
+  <header id="appHeader" style="display:none;">
+    <div class="logo-area">
+      <div class="logo-badge">Jx</div>
+      <div>
+        <div class="logo-title">JxTerminal Server</div>
+      </div>
+      <span class="tag">Admin Console</span>
+    </div>
+    <div class="nav-actions">
+      <span id="currentUserLabel" style="font-size:13px; font-weight:500;"></span>
+      <button class="btn-outline btn-sm" onclick="toggleTheme()">🌓 切换主题</button>
+      <button class="btn-outline btn-sm" onclick="logout()">退出登录</button>
+    </div>
+  </header>
+
+  <!-- View: Initial Setup (0 users) -->
+  <div class="auth-container" id="initView" style="display:none;">
+    <div class="card">
+      <div style="text-align:center; margin-bottom:20px;">
+        <div class="logo-badge" style="margin:0 auto 12px auto; width:48px; height:48px; font-size:24px;">Jx</div>
+        <h2 style="font-size:20px; margin-bottom:6px;">初始化服务端</h2>
+        <p style="font-size:13px; color:var(--text-muted);">系统检测到首次运行，请创建超级管理员账号</p>
+      </div>
+      <form onsubmit="handleInitAdmin(event)">
+        <div class="form-group">
+          <label class="form-label">管理员用户名</label>
+          <input type="text" id="initUsername" class="form-control" placeholder="admin" required minlength="3">
+        </div>
+        <div class="form-group">
+          <label class="form-label">管理员密码</label>
+          <input type="password" id="initPassword" class="form-control" placeholder="至少 6 位密码" required minlength="6">
+        </div>
+        <button type="submit" class="btn-primary" style="width:100%; justify-content:center; padding:10px; margin-top:8px;">创建超级管理员并登录</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- View: Login -->
+  <div class="auth-container" id="loginView" style="display:none;">
+    <div class="card">
+      <div style="text-align:center; margin-bottom:20px;">
+        <div class="logo-badge" style="margin:0 auto 12px auto; width:48px; height:48px; font-size:24px;">Jx</div>
+        <h2 style="font-size:20px; margin-bottom:6px;">管理员登录</h2>
+        <p style="font-size:13px; color:var(--text-muted);">JxTerminal Server 运维管理控制台</p>
+      </div>
+      <form onsubmit="handleLogin(event)">
+        <div class="form-group">
+          <label class="form-label">用户名</label>
+          <input type="text" id="loginUsername" class="form-control" placeholder="admin" required>
+        </div>
+        <div class="form-group">
+          <label class="form-label">密码</label>
+          <input type="password" id="loginPassword" class="form-control" placeholder="密码" required>
+        </div>
+        <button type="submit" class="btn-primary" style="width:100%; justify-content:center; padding:10px; margin-top:8px;">登录控制台</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- View: Dashboard Main -->
+  <main id="mainView" style="display:none;">
+    <!-- Stats Cards -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <span class="stat-label">👥 注册用户总数</span>
+        <span class="stat-val" id="statUserCount">-</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">📦 云端备份总数</span>
+        <span class="stat-val" id="statBackupCount">-</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">💾 数据存储占用</span>
+        <span class="stat-val" id="statStorageSize">-</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">🛡️ 开放注册状态</span>
+        <span class="stat-val" id="statRegStatus" style="font-size:18px;">-</span>
+      </div>
+      <div class="stat-card">
+        <span class="stat-label">⏱️ 服务运行时长</span>
+        <span class="stat-val" id="statUptime" style="font-size:18px;">-</span>
+      </div>
+    </div>
+
+    <!-- User Management Table -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">👥 用户列表与权限管理</div>
+        <button class="btn-primary btn-sm" onclick="openCreateUserModal()">➕ 创建新用户</button>
+      </div>
+      <div style="overflow-x:auto;">
+        <table>
+          <thead>
+            <tr>
+              <th>用户名</th>
+              <th>身份权限</th>
+              <th>账号状态</th>
+              <th>注册时间</th>
+              <th>备份数量与大小</th>
+              <th style="text-align:right;">操作</th>
+            </tr>
+          </thead>
+          <tbody id="userTableBody">
+            <tr><td colspan="6" style="text-align:center; color:var(--text-muted);">正在加载用户数据...</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Security & Access Control Settings -->
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">🛡️ 准入控制与安全配置</div>
+      </div>
+      <form onsubmit="handleSaveConfig(event)">
+        <div class="form-group">
+          <label class="switch-label">
+            <input type="checkbox" id="cfgAllowReg" style="width:18px; height:18px; accent-color:var(--primary);">
+            <span style="font-weight:600; font-size:14px;">允许客户端公开注册 (Allow Public Registration)</span>
+          </label>
+          <span class="form-hint" style="margin-left:28px;">关闭后，只有管理员可以在此控制台创建用户，外部客户端无法直接注册新账号。</span>
+        </div>
+        <div class="form-group" style="margin-top:16px;">
+          <label class="form-label">注册邀请码 / 接入密钥 (Registration Secret / Invite Code)</label>
+          <input type="text" id="cfgRegSecret" class="form-control" placeholder="留空则不设邀请码限制" style="max-width:400px;">
+          <span class="form-hint">若设置此密钥，客户端在注册时必须填写相匹配的密钥方可注册成功，避免陌生人随意接入。</span>
+        </div>
+        <button type="submit" class="btn-primary" style="margin-top:8px;">💾 保存安全设置</button>
+      </form>
+    </div>
+  </main>
+
+  <!-- Modal: Create User -->
+  <div class="modal-overlay" id="createUserModal">
+    <div class="modal-box">
+      <h3 style="margin-bottom:14px;">创建新用户</h3>
+      <form onsubmit="handleCreateUser(event)">
+        <div class="form-group">
+          <label class="form-label">用户名</label>
+          <input type="text" id="newUsername" class="form-control" required minlength="3">
+        </div>
+        <div class="form-group">
+          <label class="form-label">初始密码</label>
+          <input type="password" id="newPassword" class="form-control" required minlength="6">
+        </div>
+        <div class="form-group">
+          <label class="switch-label">
+            <input type="checkbox" id="newIsAdmin" style="width:16px; height:16px; accent-color:var(--primary);">
+            <span>设置为超级管理员 (Admin)</span>
+          </label>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px;">
+          <button type="button" class="btn-outline" onclick="closeModal('createUserModal')">取消</button>
+          <button type="submit" class="btn-primary">确定创建</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal: Reset Password -->
+  <div class="modal-overlay" id="resetPasswordModal">
+    <div class="modal-box">
+      <h3 style="margin-bottom:14px;">重置用户密码</h3>
+      <input type="hidden" id="resetUserId">
+      <p style="font-size:13px; color:var(--text-muted); margin-bottom:12px;" id="resetUserPrompt"></p>
+      <form onsubmit="handleResetPassword(event)">
+        <div class="form-group">
+          <label class="form-label">新密码</label>
+          <input type="password" id="resetNewPassword" class="form-control" required minlength="6" placeholder="输入至少 6 位新密码">
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:18px;">
+          <button type="button" class="btn-outline" onclick="closeModal('resetPasswordModal')">取消</button>
+          <button type="submit" class="btn-primary">保存密码</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Toast -->
+  <div class="toast" id="toast"></div>
+
+  <script>
+    let token = localStorage.getItem('jx_admin_token') || '';
+    let currentAdminName = localStorage.getItem('jx_admin_user') || '';
+
+    function showToast(msg, isError = false) {
+      const t = document.getElementById('toast');
+      t.innerText = msg;
+      t.style.borderColor = isError ? 'var(--danger)' : 'var(--success)';
+      t.style.display = 'block';
+      setTimeout(() => { t.style.display = 'none'; }, 3000);
+    }
+
+    function toggleTheme() {
+      const curr = document.documentElement.getAttribute('data-theme') || 'dark';
+      const next = curr === 'dark' ? 'light' : 'dark';
+      document.documentElement.setAttribute('data-theme', next);
+      localStorage.setItem('jx_theme', next);
+    }
+
+    if (localStorage.getItem('jx_theme') === 'light') {
+      document.documentElement.setAttribute('data-theme', 'light');
+    }
+
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
+      const k = 1024;
+      const sizes = ['B', 'KB', 'MB', 'GB'];
+      const i = Math.floor(Math.log(bytes) / Math.log(k));
+      return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '-';
+      const d = new Date(iso);
+      return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    async function api(path, options = {}) {
+      options.headers = options.headers || {};
+      if (token) {
+        options.headers['Authorization'] = 'Bearer ' + token;
+      }
+      if (options.body && typeof options.body === 'object') {
+        options.headers['Content-Type'] = 'application/json';
+        options.body = JSON.stringify(options.body);
+      }
+      const res = await fetch(path, options);
+      if (res.status === 401) {
+        logout();
+        throw new Error('未授权或登录已过期');
+      }
+      if (!res.ok) {
+        let err = '请求失败';
+        try { const j = await res.json(); err = j.error || j.message || err; } catch {}
+        throw new Error(err);
+      }
+      return res.status === 204 ? null : await res.json();
+    }
+
+    async function checkServerStatus() {
+      try {
+        const status = await api('/api/public/status');
+        if (status.userCount === 0) {
+          showView('initView');
+        } else if (token) {
+          showView('mainView');
+          loadDashboard();
+        } else {
+          showView('loginView');
+        }
+      } catch (e) {
+        showView('loginView');
+      }
+    }
+
+    function showView(viewId) {
+      document.getElementById('initView').style.display = 'none';
+      document.getElementById('loginView').style.display = 'none';
+      document.getElementById('mainView').style.display = 'none';
+      document.getElementById('appHeader').style.display = viewId === 'mainView' ? 'flex' : 'none';
+      document.getElementById(viewId).style.display = 'block';
+      if (viewId === 'mainView') {
+        document.getElementById('currentUserLabel').innerText = '👤 ' + currentAdminName;
+      }
+    }
+
+    async function handleInitAdmin(e) {
+      e.preventDefault();
+      const u = document.getElementById('initUsername').value.trim();
+      const p = document.getElementById('initPassword').value;
+      try {
+        const res = await api('/api/auth/register', { method: 'POST', body: { username: u, password: p } });
+        token = res.token;
+        currentAdminName = res.username;
+        localStorage.setItem('jx_admin_token', token);
+        localStorage.setItem('jx_admin_user', currentAdminName);
+        showToast('超级管理员创建成功！');
+        showView('mainView');
+        loadDashboard();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function handleLogin(e) {
+      e.preventDefault();
+      const u = document.getElementById('loginUsername').value.trim();
+      const p = document.getElementById('loginPassword').value;
+      try {
+        const res = await api('/api/auth/login', { method: 'POST', body: { username: u, password: p } });
+        if (!res.isAdmin) {
+          throw new Error('此账号非超级管理员，无法访问管理控制台');
+        }
+        token = res.token;
+        currentAdminName = res.username;
+        localStorage.setItem('jx_admin_token', token);
+        localStorage.setItem('jx_admin_user', currentAdminName);
+        showToast('登录成功！');
+        showView('mainView');
+        loadDashboard();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    function logout() {
+      token = '';
+      currentAdminName = '';
+      localStorage.removeItem('jx_admin_token');
+      localStorage.removeItem('jx_admin_user');
+      showView('loginView');
+    }
+
+    async function loadDashboard() {
+      await Promise.all([loadStats(), loadUsers(), loadConfig()]);
+    }
+
+    async function loadStats() {
+      try {
+        const s = await api('/api/admin/stats');
+        document.getElementById('statUserCount').innerText = s.userCount;
+        document.getElementById('statBackupCount').innerText = s.backupCount;
+        document.getElementById('statStorageSize').innerText = formatBytes(s.totalBackupSizeBytes);
+        document.getElementById('statUptime').innerText = s.uptime;
+
+        let regText = '开放';
+        if (!s.allowRegistration) regText = '已关闭';
+        else if (s.hasRegistrationSecret) regText = '需要密钥';
+        document.getElementById('statRegStatus').innerText = regText;
+      } catch (e) {}
+    }
+
+    async function loadUsers() {
+      try {
+        const users = await api('/api/admin/users');
+        const tbody = document.getElementById('userTableBody');
+        if (!users || users.length === 0) {
+          tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color:var(--text-muted);">暂无用户</td></tr>';
+          return;
+        }
+
+        tbody.innerHTML = users.map(u => `
+          <tr>
+            <td style="font-weight:600;">${escapeHtml(u.username)}</td>
+            <td>${u.isAdmin ? '<span class="badge-admin">超级管理员</span>' : '<span class="badge-user">普通用户</span>'}</td>
+            <td>${u.isDisabled ? '<span class="badge-disabled">● 已禁用</span>' : '<span class="badge-active">● 正常</span>'}</td>
+            <td>${formatDate(u.createdAt)}</td>
+            <td>${u.backupCount} 个 (${formatBytes(u.backupSizeBytes)})</td>
+            <td style="text-align:right;">
+              <button class="btn-outline btn-sm" onclick="openResetPasswordModal('${u.id}', '${escapeHtml(u.username)}')">重置密码</button>
+              ${u.isAdmin ? '' : `
+                <button class="btn-outline btn-sm" onclick="toggleUserStatus('${u.id}', ${!u.isDisabled})">
+                  ${u.isDisabled ? '启用' : '禁用'}
+                </button>
+                <button class="btn-danger btn-sm" onclick="deleteUser('${u.id}', '${escapeHtml(u.username)}')">删除</button>
+              `}
+            </td>
+          </tr>
+        `).join('');
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function loadConfig() {
+      try {
+        const cfg = await api('/api/admin/config');
+        document.getElementById('cfgAllowReg').checked = cfg.allowRegistration;
+        document.getElementById('cfgRegSecret').value = cfg.registrationSecret || '';
+      } catch (e) {}
+    }
+
+    async function handleSaveConfig(e) {
+      e.preventDefault();
+      const allowRegistration = document.getElementById('cfgAllowReg').checked;
+      const registrationSecret = document.getElementById('cfgRegSecret').value.trim();
+      try {
+        await api('/api/admin/config', {
+          method: 'PUT',
+          body: { allowRegistration, registrationSecret }
+        });
+        showToast('安全配置已更新');
+        loadStats();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    function openCreateUserModal() {
+      document.getElementById('newUsername').value = '';
+      document.getElementById('newPassword').value = '';
+      document.getElementById('newIsAdmin').checked = false;
+      document.getElementById('createUserModal').style.display = 'flex';
+    }
+
+    async function handleCreateUser(e) {
+      e.preventDefault();
+      const username = document.getElementById('newUsername').value.trim();
+      const password = document.getElementById('newPassword').value;
+      const isAdmin = document.getElementById('newIsAdmin').checked;
+      try {
+        await api('/api/admin/users', {
+          method: 'POST',
+          body: { username, password, isAdmin }
+        });
+        showToast(`用户 “${username}” 创建成功`);
+        closeModal('createUserModal');
+        loadDashboard();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    function openResetPasswordModal(id, username) {
+      document.getElementById('resetUserId').value = id;
+      document.getElementById('resetUserPrompt').innerText = `为用户 “${username}” 设置新的登录密码：`;
+      document.getElementById('resetNewPassword').value = '';
+      document.getElementById('resetPasswordModal').style.display = 'flex';
+    }
+
+    async function handleResetPassword(e) {
+      e.preventDefault();
+      const id = document.getElementById('resetUserId').value;
+      const newPassword = document.getElementById('resetNewPassword').value;
+      try {
+        await api(`/api/admin/users/${id}/reset-password`, {
+          method: 'PUT',
+          body: { newPassword }
+        });
+        showToast('密码重置成功');
+        closeModal('resetPasswordModal');
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function toggleUserStatus(id, newDisabled) {
+      try {
+        await api(`/api/admin/users/${id}/toggle-status`, { method: 'PUT' });
+        showToast(newDisabled ? '已禁用该用户' : '已重新启用该用户');
+        loadUsers();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    async function deleteUser(id, username) {
+      if (!confirm(`⚠️ 警告：确定删除用户 “${username}” 吗？\n\n该用户的所有云端备份快照将被永久级联删除，无法恢复！`)) {
+        return;
+      }
+      try {
+        await api(`/api/admin/users/${id}`, { method: 'DELETE' });
+        showToast(`已删除用户 “${username}” 及全部备份快照`);
+        loadDashboard();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    }
+
+    function closeModal(id) {
+      document.getElementById(id).style.display = 'none';
+    }
+
+    function escapeHtml(str) {
+      return (str || '').replace(/[&<>'"]/g, tag => ({
+        '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
+      }[tag] || tag));
+    }
+
+    checkServerStatus();
+  </script>
+</body>
+</html>
