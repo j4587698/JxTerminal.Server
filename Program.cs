@@ -109,7 +109,9 @@ api.MapGet("/public/status", async (UserStore users, ServerConfigService cfg) =>
         userCount,
         allowRegistration = config.AllowRegistration,
         hasRegistrationSecret = !string.IsNullOrEmpty(config.RegistrationSecret),
-        version = typeof(UserStore).Assembly.GetName().Version?.ToString() ?? "1.0.0"
+        version = typeof(UserStore).Assembly.GetName().Version != null
+            ? $"{typeof(UserStore).Assembly.GetName().Version!.Major}.{typeof(UserStore).Assembly.GetName().Version!.Minor}"
+            : "0.1"
     });
 });
 
