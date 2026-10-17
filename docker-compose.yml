@@ -1,5 +1,6 @@
 services:
   jxterminal-server:
+    image: ghcr.io/j4587698/jxterminal.server:latest
     build: .
     container_name: jxterminal-server
     restart: unless-stopped

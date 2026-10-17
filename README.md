@@ -18,18 +18,21 @@
 
 ## 快速开始
 
-### 方式一：Docker Compose（推荐）
+### 方式一：Docker / Docker Compose（推荐，Native AOT 极速容器）
 
-1. 克隆或下载本项目：
-   ```bash
-   git clone https://github.com/j4587698/JxTerminal.Server.git
-   cd JxTerminal.Server
-   ```
+#### 直接拉取 GHCR 镜像运行（一行命令即可）：
+```bash
+docker run -d \
+  --name jxterminal-server \
+  --restart unless-stopped \
+  -p 5000:5000 \
+  -v ./data:/app/data \
+  ghcr.io/j4587698/jxterminal.server:latest
+```
 
-2. 启动服务：
-   ```bash
-   docker compose up -d
-   ```
+#### 或使用 Docker Compose：
+1. 下载 `docker-compose.yml`
+2. 执行 `docker compose up -d`
 
 3. 打开浏览器访问：
    ```text
@@ -101,7 +104,7 @@ dotnet JxTerminal.Server.dll --delete-user <username>
 ```
 
 > **提示**：
-> - 若使用 Docker 容器部署，只需执行 `docker exec -it <container_id_or_name> dotnet JxTerminal.Server.dll --list-users` 或 `--reset-password <username> <new-password>` 即可。
+> - 若使用 Docker 容器部署，只需执行 `docker exec -it <container_id_or_name> ./JxTerminal.Server --list-users` 或 `--reset-password <username> <new-password>` 即可。
 > - 若数据库目录不在默认路径，可附加 `--data-dir <path>` 参数指定数据目录。
 > - **关于端到端加密（E2EE）同步**：密码重置后，请在任意一台保留有正常本地配置的客户端上使用新密码重新登录并同步一次，客户端会自动使用新密码生成的密钥重新加密并更新云端数据。
 

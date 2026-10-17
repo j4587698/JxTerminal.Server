@@ -1,13 +1,27 @@
+# Build stage with .NET 10 SDK and Native AOT toolchain
 FROM mcr.microsoft.com/dotnet/sdk:10.0 AS build
 WORKDIR /src
+
+# Install clang and zlib needed for Native AOT compilation and linking
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    clang \
+    zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY ["JxTerminal.Server.csproj", "./"]
 RUN dotnet restore "JxTerminal.Server.csproj"
 
 COPY . .
-RUN dotnet publish "JxTerminal.Server.csproj" -c Release -o /app/publish /p:UseAppHost=false
 
-FROM mcr.microsoft.com/dotnet/aspnet:10.0 AS final
+# Publish Native AOT binary (architecture is determined automatically by the build container)
+RUN dotnet publish "JxTerminal.Server.csproj" \
+    -c Release \
+    -p:PublishAot=true \
+    -p:StripSymbols=true \
+    -o /app/publish
+
+# Runtime stage using ultra-lean .NET runtime dependencies image
+FROM mcr.microsoft.com/dotnet/runtime-deps:10.0 AS final
 WORKDIR /app
 EXPOSE 5000
 
@@ -18,4 +32,7 @@ ENV ASPNETCORE_URLS=http://+:5000 \
 VOLUME ["/app/data"]
 
 COPY --from=build /app/publish .
-ENTRYPOINT ["dotnet", "JxTerminal.Server.dll"]
+
+RUN chmod +x ./JxTerminal.Server
+
+ENTRYPOINT ["./JxTerminal.Server"]
