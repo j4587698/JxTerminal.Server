@@ -18,6 +18,10 @@
     <!-- Native AOT ships no reflection-based JSON serializer. Disable it locally too, so
          any type missing from AppJsonContext fails immediately during development. -->
     <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
+    <!-- The Alpine runtime image carries no ICU (~30 MB saved). Invariant mode removes
+         culture-specific behavior (named cultures, culture-aware sorting, Turkish-i casing);
+         Unicode simple casing and the ISO date formats used here keep working. -->
+    <InvariantGlobalization>true</InvariantGlobalization>
   </PropertyGroup>
 
   <ItemGroup>
