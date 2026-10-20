@@ -1,5 +1,6 @@
 using System.Security.Claims;
 using JxTerminal.Server.Models;
+using JxTerminal.Server.Serialization;
 using JxTerminal.Server.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.JsonWebTokens;
@@ -74,6 +75,14 @@ builder.Services.AddSingleton(new UserStore(db));
 builder.Services.AddSingleton(tokenService);
 builder.Services.AddSingleton(configService);
 
+// Native AOT has no reflection-based JSON serializer, so all request/response
+// types are served by the source-generated context. This is what makes minimal-API
+// body binding and Results.Ok(...) work in the AOT image.
+builder.Services.ConfigureHttpJsonOptions(o =>
+{
+    o.SerializerOptions.TypeInfoResolverChain.Insert(0, AppJsonContext.Default);
+});
+
 // The client is a desktop app, but allowing CORS keeps the API testable from a browser.
 builder.Services.AddCors(o => o.AddDefaultPolicy(p =>
     p.AllowAnyOrigin().AllowAnyHeader().AllowAnyMethod()));
@@ -97,22 +106,20 @@ app.UseAuthorization();
 
 var api = app.MapGroup("/api");
 
-api.MapGet("/health", () => Results.Ok(new { status = "ok", time = DateTime.UtcNow }));
+api.MapGet("/health", () => Results.Ok(new HealthResponse("ok", DateTime.UtcNow)));
 
 // Public server metadata for UI onboarding and registration requirements
 api.MapGet("/public/status", async (UserStore users, ServerConfigService cfg) =>
 {
     var config = await cfg.GetConfigAsync();
     var userCount = await users.GetCountAsync();
-    return Results.Ok(new
-    {
+    return Results.Ok(new PublicStatusResponse(
         userCount,
-        allowRegistration = config.AllowRegistration,
-        hasRegistrationSecret = !string.IsNullOrEmpty(config.RegistrationSecret),
-        version = typeof(UserStore).Assembly.GetName().Version != null
+        config.AllowRegistration,
+        !string.IsNullOrEmpty(config.RegistrationSecret),
+        typeof(UserStore).Assembly.GetName().Version != null
             ? $"{typeof(UserStore).Assembly.GetName().Version!.Major}.{typeof(UserStore).Assembly.GetName().Version!.Minor}"
-            : "0.1"
-    });
+            : "0.1"));
 });
 
 // Helper for extracting current user ID
@@ -131,14 +138,14 @@ auth.MapPost("/register", async (RegisterRequest request, UserStore users, Token
     {
         if (!config.AllowRegistration)
         {
-            return Results.BadRequest(new { error = "Registration is closed on this server." });
+            return Results.BadRequest(new ErrorResponse("Registration is closed on this server."));
         }
 
         if (!string.IsNullOrEmpty(config.RegistrationSecret))
         {
             if (string.IsNullOrWhiteSpace(request.Secret) || request.Secret != config.RegistrationSecret)
             {
-                return Results.BadRequest(new { error = "Invalid registration secret / invite code." });
+                return Results.BadRequest(new ErrorResponse("Invalid registration secret / invite code."));
             }
         }
     }
@@ -154,7 +161,7 @@ auth.MapPost("/register", async (RegisterRequest request, UserStore users, Token
     }
     catch (ArgumentException ex)
     {
-        return Results.BadRequest(new { error = ex.Message });
+        return Results.BadRequest(new ErrorResponse(ex.Message));
     }
 });
 
@@ -163,7 +170,7 @@ auth.MapPost("/login", async (LoginRequest request, UserStore users, TokenServic
     var (user, error) = await users.ValidateAsync(request.Username ?? "", request.Password ?? "");
     if (user == null)
     {
-        return Results.BadRequest(new { error = error ?? "Invalid username or password." });
+        return Results.BadRequest(new ErrorResponse(error ?? "Invalid username or password."));
     }
 
     return Results.Ok(new AuthResponse(
@@ -179,13 +186,7 @@ auth.MapGet("/me", async (HttpContext http, UserStore users) =>
     var user = string.IsNullOrEmpty(userId) ? null : await users.GetByIdAsync(userId);
     return user == null
         ? Results.Unauthorized()
-        : Results.Ok(new
-        {
-            id = user.Id,
-            username = user.Username,
-            isAdmin = user.IsAdmin,
-            createdAt = user.CreatedAt
-        });
+        : Results.Ok(new MeResponse(user.Id, user.Username, user.IsAdmin, user.CreatedAt));
 }).RequireAuthorization();
 
 auth.MapPost("/change-password", async (ChangePasswordRequest request, HttpContext http, UserStore users, TokenService tokens) =>
@@ -207,7 +208,7 @@ auth.MapPost("/change-password", async (ChangePasswordRequest request, HttpConte
     }
     catch (ArgumentException ex)
     {
-        return Results.BadRequest(new { error = ex.Message });
+        return Results.BadRequest(new ErrorResponse(ex.Message));
     }
 }).RequireAuthorization();
 
@@ -236,7 +237,7 @@ backups.MapPost("/", async (BackupUploadRequest request, HttpContext http, Backu
 
     if (string.IsNullOrWhiteSpace(request.SnapshotJson))
     {
-        return Results.BadRequest(new { error = "snapshotJson is required." });
+        return Results.BadRequest(new ErrorResponse("snapshotJson is required."));
     }
 
     var record = await store.CreateAsync(userId, request.DeviceName, request.Comment, request.SnapshotJson, request.AppVersion);
@@ -262,16 +263,14 @@ sync.MapGet("/status", async (HttpContext http, BackupStore store) =>
     var record = await store.GetLatestAsync(userId);
     if (record == null)
     {
-        return Results.Ok(new { hasData = false, updatedAt = (DateTime?)null, id = "", deviceName = "", appVersion = "" });
+        return Results.Ok(new SyncStatusResponse(false, null, "", "", ""));
     }
-    return Results.Ok(new
-    {
-        hasData = true,
-        updatedAt = (DateTime?)record.CreatedAt,
-        id = record.Id,
-        deviceName = record.DeviceName,
-        appVersion = record.AppVersion
-    });
+    return Results.Ok(new SyncStatusResponse(
+        true,
+        record.CreatedAt,
+        record.Id,
+        record.DeviceName,
+        record.AppVersion));
 });
 
 sync.MapGet("/latest", async (HttpContext http, BackupStore store) =>
@@ -290,21 +289,19 @@ sync.MapPost("/", async (BackupUploadRequest request, HttpContext http, BackupSt
 
     if (string.IsNullOrWhiteSpace(request.SnapshotJson))
     {
-        return Results.BadRequest(new { error = "snapshotJson is required." });
+        return Results.BadRequest(new ErrorResponse("snapshotJson is required."));
     }
 
     var record = await store.CreateAsync(userId, request.DeviceName, request.Comment ?? "AutoSync", request.SnapshotJson, request.AppVersion);
     await store.PruneAsync(userId, maxKeep: 10);
-    return Results.Ok(new
-    {
-        id = record.Id,
-        deviceName = record.DeviceName,
-        comment = record.Comment,
-        createdAt = record.CreatedAt,
-        updatedAt = record.CreatedAt,
-        appVersion = record.AppVersion,
-        sizeBytes = System.Text.Encoding.UTF8.GetByteCount(record.SnapshotJson)
-    });
+    return Results.Ok(new SyncResultResponse(
+        record.Id,
+        record.DeviceName,
+        record.Comment,
+        record.CreatedAt,
+        record.CreatedAt,
+        record.AppVersion,
+        System.Text.Encoding.UTF8.GetByteCount(record.SnapshotJson)));
 });
 
 // ---- Admin endpoints (require Admin role) ----
@@ -373,11 +370,11 @@ admin.MapPost("/users", async (CreateUserRequest request, UserStore users) =>
     try
     {
         var user = await users.RegisterAsync(request.Username ?? "", request.Password ?? "", request.IsAdmin);
-        return Results.Ok(new { id = user.Id, username = user.Username, isAdmin = user.IsAdmin });
+        return Results.Ok(new UserCreatedResponse(user.Id, user.Username, user.IsAdmin));
     }
     catch (ArgumentException ex)
     {
-        return Results.BadRequest(new { error = ex.Message });
+        return Results.BadRequest(new ErrorResponse(ex.Message));
     }
 });
 
@@ -386,7 +383,7 @@ admin.MapDelete("/users/{id}", async (string id, HttpContext http, UserStore use
     var currentId = CurrentUserId(http);
     if (currentId == id)
     {
-        return Results.BadRequest(new { error = "Cannot delete your own admin account." });
+        return Results.BadRequest(new ErrorResponse("Cannot delete your own admin account."));
     }
 
     var user = await users.GetByIdAsync(id);
@@ -403,14 +400,14 @@ admin.MapPut("/users/{id}/toggle-status", async (string id, HttpContext http, Us
     var currentId = CurrentUserId(http);
     if (currentId == id)
     {
-        return Results.BadRequest(new { error = "Cannot disable your own admin account." });
+        return Results.BadRequest(new ErrorResponse("Cannot disable your own admin account."));
     }
 
     var user = await users.GetByIdAsync(id);
     if (user == null) return Results.NotFound();
 
     await users.SetDisabledAsync(id, !user.IsDisabled);
-    return Results.Ok(new { id, isDisabled = !user.IsDisabled });
+    return Results.Ok(new ToggleStatusResponse(id, !user.IsDisabled));
 });
 
 admin.MapPut("/users/{id}/reset-password", async (string id, ResetPasswordRequest request, UserStore users) =>
@@ -418,32 +415,24 @@ admin.MapPut("/users/{id}/reset-password", async (string id, ResetPasswordReques
     try
     {
         var success = await users.ResetPasswordAsync(id, request.NewPassword ?? "");
-        return success ? Results.Ok(new { status = "ok" }) : Results.NotFound();
+        return success ? Results.Ok(new OkResponse("ok")) : Results.NotFound();
     }
     catch (ArgumentException ex)
     {
-        return Results.BadRequest(new { error = ex.Message });
+        return Results.BadRequest(new ErrorResponse(ex.Message));
     }
 });
 
 admin.MapGet("/config", async (ServerConfigService cfg) =>
 {
     var config = await cfg.GetConfigAsync();
-    return Results.Ok(new
-    {
-        allowRegistration = config.AllowRegistration,
-        registrationSecret = config.RegistrationSecret
-    });
+    return Results.Ok(new ConfigResponse(config.AllowRegistration, config.RegistrationSecret));
 });
 
 admin.MapPut("/config", async (UpdateConfigRequest request, ServerConfigService cfg) =>
 {
     var updated = await cfg.UpdateConfigAsync(request.AllowRegistration, request.RegistrationSecret);
-    return Results.Ok(new
-    {
-        allowRegistration = updated.AllowRegistration,
-        registrationSecret = updated.RegistrationSecret
-    });
+    return Results.Ok(new ConfigResponse(updated.AllowRegistration, updated.RegistrationSecret));
 });
 
 app.Run();

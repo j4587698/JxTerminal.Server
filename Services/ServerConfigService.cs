@@ -29,10 +29,13 @@ public sealed class ServerConfigService
         var record = await col.FindByIdAsync("config");
         if (record == null)
         {
+            // ConfigurationBinder.GetValue<T> is annotated [RequiresUnreferencedCode] and
+            // triggers IL2026 under Native AOT; parsing the raw string keeps us trim-safe.
+            var allowRegistrationRaw = _config["Auth:AllowRegistration"];
             record = new ServerConfigRecord
             {
                 Id = "config",
-                AllowRegistration = _config.GetValue("Auth:AllowRegistration", true),
+                AllowRegistration = bool.TryParse(allowRegistrationRaw, out var allowRegistration) ? allowRegistration : true,
                 RegistrationSecret = _config["Auth:RegistrationSecret"] ?? "",
                 UpdatedAt = DateTime.UtcNow
             };

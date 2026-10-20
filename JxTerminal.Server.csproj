@@ -1,5 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
-
+  <Sdk Name="PublishWithSatoriGC" Version="10.0.13-satori.39356568198.1" />
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
@@ -8,6 +8,16 @@
     <Version>0.1.0</Version>
     <AssemblyVersion>0.1.0.0</AssemblyVersion>
     <FileVersion>0.1.0.0</FileVersion>
+
+    <!-- This service is published with PublishAot=true (see Dockerfile). Turn the same
+         code paths on for ordinary builds so AOT-only failures surface at compile time
+         instead of as a startup crash inside the container. -->
+    <EnableRequestDelegateGenerator>true</EnableRequestDelegateGenerator>
+    <EnableAotAnalyzer>true</EnableAotAnalyzer>
+    <EnableTrimAnalyzer>true</EnableTrimAnalyzer>
+    <!-- Native AOT ships no reflection-based JSON serializer. Disable it locally too, so
+         any type missing from AppJsonContext fails immediately during development. -->
+    <JsonSerializerIsReflectionEnabledByDefault>false</JsonSerializerIsReflectionEnabledByDefault>
   </PropertyGroup>
 
   <ItemGroup>
